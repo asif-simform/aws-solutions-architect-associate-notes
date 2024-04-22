@@ -119,12 +119,20 @@ https://aws-solutions-architect-associate-notes.vercel.app
 | 6   | [AWS Global Accelerator - Overview](#AWS-Global-Accelerator---Overview)                                 |
 |     | **AWS Storage Extras**                                                                                  |
 | 1   | [AWS Snow Family Overview](#AWS-Snow-Family-Overview)                                                   |
-| 2   | [Solution Architecture Snowball into Glacier](#Solution-Architecture-Snowball-into-Glacier)           |
+| 2   | [Solution Architecture Snowball into Glacier](#Solution-Architecture-Snowball-into-Glacier)             |
 | 3   | [Amazon FSx Overview](#Amazon-FSx-Overview)                                                             |
 | 4   | [Storage Gateway Overview](#Storage-Gateway-Overview)                                                   |
 | 5   | [AWS Transfer Family](#AWS-Transfer-Family)                                                             |
 | 6   | [AWS DataSync](#AWS-DataSync)                                                                           |
 | 7   | [All AWS Storage Options Compared](#All-AWS-Storage-Options-Compared)                                   |
+|     | **AWS Integration & Messaging (SQS, SNS & Kinesis)**                                                    |
+| 1   | [](#)                                                   |
+| 2   | [](#)                                                   |
+| 3   | [](#)                                                   |
+| 4   | [](#)                                                   |
+| 5   | [](#)                                                   |
+| 6   | [](#)                                                   |
+| 7   | [](#)                                                   |
 
 
 
@@ -2146,7 +2154,7 @@ https://aws-solutions-architect-associate-notes.vercel.app
   - Most clients would use the HTTPS endpoint by default
 
 - Amazon S3 – Default Encryption vs. Bucket Policies
-  • SSE-S3 encryption is automatically applied to new objects stored in S3 bucket
+  - SSE-S3 encryption is automatically applied to new objects stored in S3 bucket
   • Optionally, you can “force encryption” using a bucket policy and refuse any API call to PUT an S3 object without encryption headers (SSE-KMS or SSE-C)
 
   > Note: Bucket Policies are evaluated before “Default Encr yption”
@@ -2662,6 +2670,100 @@ https://aws-solutions-architect-associate-notes.vercel.app
 - **DataSync:**Scheduledatasyncfromon-premisestoAWS,orAWStoAWS
 - **Snowcone / Snowball / Snowmobile:** to move large amount of data to the cloud, physically 
 - **Database:** for specific workloads, usually with indexing and querying
+
+
+## AWS Integration & Messaging (SQS, SNS & Kinesis)
+
+### 1. AWS Integration Introduction
+- When we start deploying multiple applications, they will inevitably need to communicate with one another
+- There are two patterns of application communication
+
+  - 1. Synchronous communications (application to application)
+      - Buying Service > Shpping Service
+
+  - 2. Asynchronous / Event based (application to queue to application)
+      - Buying Service > Queue > Shpping Service
+
+### 2. Amazon SQS – Standard Queue
+- Oldest offering (over 10 years old)
+- Fully managed service, used to decouple applications
+- Attributes:
+  - Unlimited throughput, unlimited number of messages in queue
+  - Default retention of messages: 4 days, maximum of 14 days 
+  - Low latency (<10 ms on publish and receive)
+  - Limitation of 256KB per message sent
+- Can have duplicate messages (at least once delivery, occasionally) 
+- Can have out of order messages (best effort ordering)
+
+- Producing Messages
+  - Produced to SQS using the SDK (SendMessage API)
+  - The message is persisted in SQS until a consumer deletes it 
+  - Message retention: default 4 days, up to 14 days
+  - Example: send an order to be processed 
+    - Order id
+    - Customer id
+    - Any attributes you want
+  - SQS standard: unlimited throughput
+
+- Consuming Messages
+  - Consumers (running on EC2 instances, servers, or AWS Lambda)...
+  - Poll SQS for messages (receive up to 10 messages at a time)
+  - Process the messages (example: insert the message into an RDS database) 
+  - Delete the messages using the DeleteMessage API
+
+- Multiple EC2 Instances Consumers
+  - Consumers receive and process messages in parallel
+  - At least once delivery
+  - Best-effort message ordering
+  - Consumers delete messages after processing them
+  - We can scale consumers horizontally to improve throughput of processing
+
+### 3. Amazon SQS - Security
+
+- Encryption:
+  - In-flight encryption using HTTPS API
+  - At-rest encryption using KMS keys
+  - Client-side encryption if the client wants to perform encryption/decryption itself
+- Access Controls: IAM policies to regulate access to the SQS API
+- SQS Access Policies (similar to S3 bucket policies)
+  - Useful for cross-account access to SQS queues
+  - Useful for allowing other services (SNS, S3...) to write to an SQS queue
+
+
+### 4. SQS – Message Visibility Timeout
+- After a message is polled by a consumer, it becomes invisible to other consumers
+- By default, the “message visibility timeout” is 30 seconds
+- That means the message has 30 seconds to be processed
+- After the message visibility timeout is over, the message is “visible” in SQS
+
+- If a message is not processed within the visibility timeout, it will be processed twice 
+- A consumer could call the ChangeMessageVisibility API to get more time
+- If visibility timeout is high (hours), and consumer crashes, re-processing will take time 
+- If visibility timeout is too low (seconds), we may get duplicates
+
+### 5. Amazon SQS - Long Polling
+- When a consumer requests messages from the queue, it can optionally “wait” for messages to arrive if there are none in the queue. This is called Long Polling
+- LongPolling decreases the number of API calls made to SQS while increasing the efficiency and reducing latency of your application
+- The wait time can be between 1 sec to 20 sec (20 sec preferable)
+- Long Polling is preferable to Short Polling
+- Long polling can be enabled at the queue level or at the API level using WaitTimeSeconds
+
+### 6. Amazon SQS – FIFO Queue
+- FIFO = First In First Out (ordering of messages in the queue)
+- Limited throughput: 300 msg/s without batching, 3000 msg/s with 
+- Exactly-once send capability (by removing duplicates)
+- Messages are processed in order by the consumer
+
+### 7. SQS with Auto Scaling Group (ASG)
+- SQS with Auto Scaling Group used when handle large scale of messages
+- If the load is too big, some transactions may be lost so Insert transactions in DB (Amazon RDS, Amazon Aurora, Amazon DynamoDB). 
+- SQS as a buffer to database writes
+  - requests > Enqueue message (Auto-Scaling) > SendMessage > **SQS Queue** > ReceiveMessages > Dequeue message (Auto-Scaling) > Insert in DB
+- SQS to decouple between application tiers
+  - requests > Front-end web app (Auto-Scaling) > SendMessage > **SQS Queue** > ReceiveMessages > Back-end processing (Auto-Scaling)
+
+### 8. Amazon Simple Notification Service (AWS SNS)
+
 
 ---
 # 🛡️ License

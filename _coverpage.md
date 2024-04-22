@@ -20,6 +20,7 @@
 - Amazon S3 – Security
 - CloudFront & AWS Global Accelerator
 - AWS Storage Extras
+- AWS Integration & Messaging (SQS, SNS & Kinesis)
 
 [GitHub](https://github.com/asifvora/aws-solutions-architect-associate-notes)
 [Get Started](#aws-solutions-architect-associate-notes)
